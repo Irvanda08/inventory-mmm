@@ -1,14 +1,22 @@
 <?php
-include 'config/database.php';
-include 'templates/header.php';
-include 'templates/sidebar.php';
+// 1. Inisialisasi Session & Database
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
+include 'config/database.php';
+
+// 2. Proteksi Halaman
 if (!isset($_SESSION['user_id'])) {
     header("Location: auth/login.php");
     exit;
 }
 
-// Ambil data transaksi dengan Join
+// 3. Header & Sidebar
+include 'templates/header.php';
+include 'templates/sidebar.php';
+
+// 4. Ambil data transaksi dengan Join ke tabel barang
 $data = mysqli_query($conn, "
     SELECT t.*, b.nama_barang, b.satuan, b.kode_barang 
     FROM transaksi_barang t
@@ -16,16 +24,23 @@ $data = mysqli_query($conn, "
     ORDER BY t.tanggal DESC, t.id_transaksi DESC
 ");
 
-// Hitung Ringkasan untuk Statistik
-$total_masuk = mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(jumlah) as total FROM transaksi_barang WHERE jenis='masuk'"))['total'] ?? 0;
-$total_keluar = mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(jumlah) as total FROM transaksi_barang WHERE jenis='keluar'"))['total'] ?? 0;
+// 5. Hitung Ringkasan Statistik secara Real-time dari Database
+$q_stats = mysqli_query($conn, "
+    SELECT 
+        SUM(CASE WHEN LOWER(TRIM(jenis)) = 'masuk' THEN jumlah ELSE 0 END) as masuk,
+        SUM(CASE WHEN LOWER(TRIM(jenis)) = 'keluar' THEN jumlah ELSE 0 END) as keluar
+    FROM transaksi_barang
+");
+$stats = mysqli_fetch_assoc($q_stats);
+$total_masuk = $stats['masuk'] ?? 0;
+$total_keluar = $stats['keluar'] ?? 0;
 ?>
 
-<main class="flex-1 bg-slate-50 min-h-screen p-4 md:p-8">
+<main class="flex-1 bg-slate-50 min-h-screen p-4 md:p-8 w-full">
     
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 w-full">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800">Riwayat Transaksi</h1>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Riwayat Transaksi</h1>
             <p class="text-sm text-slate-500 mt-1">Pantau arus masuk dan keluar barang gudang PT MMM</p>
         </div>
         
@@ -33,7 +48,7 @@ $total_keluar = mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(jumlah) as to
             <div class="relative hidden sm:block">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">🔍</span>
                 <input type="text" id="searchTransaksi" placeholder="Cari transaksi..." 
-                    class="pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-64 transition-all">
+                    class="pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-64 md:w-80 transition-all shadow-sm">
             </div>
 
             <button onclick="document.getElementById('modal').classList.remove('hidden')"
@@ -43,72 +58,74 @@ $total_keluar = mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(jumlah) as to
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl">🔄</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 w-full">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow">
+            <div class="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center text-2xl">🔄</div>
             <div>
-                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Transaksi</p>
-                <p class="text-xl font-bold text-slate-800"><?= mysqli_num_rows($data); ?></p>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Total Record</p>
+                <p class="text-2xl font-black text-slate-800"><?= mysqli_num_rows($data); ?></p>
             </div>
         </div>
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div class="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-xl">📥</div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow">
+            <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">📥</div>
             <div>
-                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Barang Masuk</p>
-                <p class="text-xl font-bold text-slate-800"><?= number_format($total_masuk); ?></p>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Barang Masuk</p>
+                <p class="text-2xl font-black text-slate-800"><?= number_format($total_masuk); ?></p>
             </div>
         </div>
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center text-xl">📤</div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow">
+            <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-2xl">📤</div>
             <div>
-                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Barang Keluar</p>
-                <p class="text-xl font-bold text-slate-800"><?= number_format($total_keluar); ?></p>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Barang Keluar</p>
+                <p class="text-2xl font-black text-slate-800"><?= number_format($total_keluar); ?></p>
             </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden w-full">
         <div class="overflow-x-auto">
-            <table class="w-full text-left" id="tableTransaksi">
+            <table class="w-full text-left table-auto" id="tableTransaksi">
                 <thead>
-                    <tr class="bg-slate-50 border-b border-slate-100">
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Barang</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Jenis</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Jumlah</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                    <tr class="bg-slate-50/50 border-b border-slate-100">
+                        <th class="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
+                        <th class="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Barang</th>
+                        <th class="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Jenis</th>
+                        <th class="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Jumlah</th>
+                        <th class="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     <?php while($t = mysqli_fetch_assoc($data)) { 
-                        $jenis_bersih = trim(strtolower($t['jenis'])); // Pembersihan data
+                        $jenis_bersih = trim(strtolower($t['jenis']));
                     ?>
-                    <tr class="hover:bg-slate-50/50 transition-colors">
-                        <td class="px-6 py-4">
+                    <tr class="hover:bg-slate-50/50 transition-colors group">
+                        <td class="px-8 py-4">
                             <span class="text-sm font-medium text-slate-600"><?= date('d M Y', strtotime($t['tanggal'])); ?></span>
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-8 py-4">
                             <div class="flex flex-col">
-                                <span class="font-bold text-slate-700"><?= htmlspecialchars($t['nama_barang']); ?></span>
-                                <span class="text-[10px] text-slate-400 font-mono uppercase"><?= $t['kode_barang'] ?? 'CODE'; ?></span>
+                                <span class="font-bold text-slate-700 group-hover:text-blue-600 transition-colors"><?= htmlspecialchars($t['nama_barang']); ?></span>
+                                <span class="text-[10px] text-slate-400 font-mono uppercase tracking-tighter"><?= htmlspecialchars($t['kode_barang']); ?></span>
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-8 py-4 text-center">
                             <?php if($jenis_bersih == 'masuk'): ?>
-                                <span class="px-3 py-1 text-[10px] font-bold uppercase rounded-full bg-green-100 text-green-600">Masuk</span>
+                                <span class="px-3 py-1 text-[10px] font-black uppercase rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200">Masuk</span>
                             <?php else: ?>
-                                <span class="px-3 py-1 text-[10px] font-bold uppercase rounded-full bg-red-100 text-red-600">Keluar</span>
+                                <span class="px-3 py-1 text-[10px] font-black uppercase rounded-full bg-rose-100 text-rose-700 ring-1 ring-rose-200">Keluar</span>
                             <?php endif; ?>
                         </td>
-                        <td class="px-6 py-4 text-right">
-                            <span class="font-bold <?= $jenis_bersih == 'masuk' ? 'text-green-600' : 'text-red-600'; ?>">
-                                <?= $jenis_bersih == 'masuk' ? '+' : '-'; ?> <?= number_format($t['jumlah']); ?>
-                            </span>
-                            <span class="text-[10px] text-slate-400 uppercase ml-1"><?= htmlspecialchars($t['satuan']); ?></span>
+                        <td class="px-8 py-4 text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="font-black text-base <?= $jenis_bersih == 'masuk' ? 'text-emerald-600' : 'text-rose-600'; ?>">
+                                    <?= $jenis_bersih == 'masuk' ? '+' : '-'; ?> <?= number_format($t['jumlah']); ?>
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><?= htmlspecialchars($t['satuan']); ?></span>
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm text-slate-500 italic truncate max-w-xs">
-                                <?= !empty($t['keterangan']) ? htmlspecialchars($t['keterangan']) : '-'; ?>
+                        <td class="px-8 py-4">
+                            <p class="text-sm text-slate-500 italic truncate max-w-[200px]" title="<?= htmlspecialchars($t['keterangan'] ?? ''); ?>">
+                                <?= !empty($t['keterangan']) ? htmlspecialchars($t['keterangan']) : '<span class="text-slate-300">Tanpa catatan</span>'; ?>
                             </p>
                         </td>
                     </tr>
@@ -120,74 +137,79 @@ $total_keluar = mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(jumlah) as to
 </main>
 
 <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h2 class="font-bold text-slate-700 text-lg">Input Transaksi Baru</h2>
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="bg-slate-50 px-8 py-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 class="font-bold text-slate-700 text-lg uppercase tracking-tight">Input Transaksi Baru</h2>
             <button onclick="document.getElementById('modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
         </div>
         
-        <form action="transaksi_simpan.php" method="POST" class="p-6 space-y-4">
-            <div class="space-y-1">
-                <label class="text-xs font-bold text-slate-500 uppercase">Pilih Barang</label>
-                <select name="id_barang" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+        <form action="transaksi_simpan.php" method="POST" class="p-8 space-y-5">
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Produk</label>
+                <select name="id_barang" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer">
                     <option value="">-- Cari Nama Barang --</option>
                     <?php
-                    $barang = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang");
+                    // Mengambil data stok_awal terbaru dari Master Barang
+                    $barang = mysqli_query($conn, "SELECT id_barang, nama_barang, kode_barang, stok_awal FROM barang ORDER BY nama_barang");
                     while($b = mysqli_fetch_assoc($barang)) { ?>
-                        <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?> (Stok: <?= $b['stok_awal']; ?>)</option>
+                        <option value="<?= $b['id_barang']; ?>">
+                            <?= htmlspecialchars($b['nama_barang']); ?> (Stok Master: <?= $b['stok_awal']; ?>)
+                        </option>
                     <?php } ?>
                 </select>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-slate-500 uppercase">Jenis Transaksi</label>
-                    <select name="jenis" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="grid grid-cols-2 gap-5">
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Jenis Arus</label>
+                    <select name="jenis" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all cursor-pointer">
                         <option value="masuk">📥 Barang Masuk</option>
                         <option value="keluar">📤 Barang Keluar</option>
                     </select>
                 </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-slate-500 uppercase">Jumlah</label>
-                    <input type="number" name="jumlah" placeholder="0" min="1" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Unit</label>
+                    <input type="number" name="jumlah" placeholder="0" min="1" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all font-bold">
                 </div>
             </div>
 
-            <div class="space-y-1">
-                <label class="text-xs font-bold text-slate-500 uppercase">Tanggal Transaksi</label>
-                <input type="date" name="tanggal" value="<?= date('Y-m-d'); ?>" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Tanggal Transaksi</label>
+                <input type="date" name="tanggal" value="<?= date('Y-m-d'); ?>" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all font-medium">
             </div>
 
-            <div class="space-y-1">
-                <label class="text-xs font-bold text-slate-500 uppercase">Keterangan / Tujuan</label>
-                <textarea name="keterangan" rows="3" placeholder="Informasi tambahan..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Keterangan / Tujuan</label>
+                <textarea name="keterangan" rows="3" placeholder="Info tambahan..." class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none"></textarea>
             </div>
 
-            <div class="flex justify-end gap-3 pt-4">
+            <div class="flex justify-end gap-3 pt-6 border-t border-slate-50">
                 <button type="button" onclick="document.getElementById('modal').classList.add('hidden')"
-                    class="px-5 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-all">Batal</button>
-                <button type="submit" class="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20 transition-all">Simpan Transaksi</button>
+                    class="px-6 py-2.5 text-xs font-black text-slate-400 hover:text-slate-600 transition-all">Batal</button>
+                <button type="submit" class="px-8 py-2.5 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all uppercase tracking-widest">Simpan Data</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    // Fitur Search Real-time
+    // Search Real-time
     document.getElementById('searchTransaksi').addEventListener('keyup', function() {
         let filter = this.value.toLowerCase();
         let rows = document.querySelectorAll('#tableTransaksi tbody tr');
 
         rows.forEach(row => {
-            let text = row.innerText.toLowerCase();
-            row.style.display = text.includes(filter) ? '' : 'none';
+            let content = row.innerText.toLowerCase();
+            row.style.display = content.includes(filter) ? '' : 'none';
         });
     });
 
-    // Tutup modal klik luar
+    // Close Modal on Overlay Click
     window.onclick = function(event) {
         let modal = document.getElementById('modal');
-        if (event.target == modal) modal.classList.add('hidden');
+        if (event.target == modal) {
+            modal.classList.add('hidden');
+        }
     }
 </script>
 
