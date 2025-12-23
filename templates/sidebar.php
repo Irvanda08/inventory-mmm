@@ -36,53 +36,66 @@
     </div>
   </div>
 
-  <nav class="flex-1 px-3 py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 space-y-8">
+  <nav class="flex-1 px-3 py-6 overflow-y-auto space-y-8">
     
     <div class="flex flex-col">
         <p class="px-4 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-3">Utama</p>
         <div class="flex flex-col gap-1">
-            <a href="dashboard.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
+            <a href="dashboard.php" class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
                 <span class="icon">🏠</span>
                 <span class="text-sm font-medium">Dashboard</span>
             </a>
-            <a href="barang.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'barang.php' ? 'active' : ''; ?>">
+            
+            <?php if($_SESSION['role'] === 'admin'): ?>
+            <a href="barang.php" class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'barang.php' ? 'active' : ''; ?>">
                 <span class="icon">📋</span>
                 <span class="text-sm font-medium">Master Barang</span>
             </a>
+            <?php endif; ?>
         </div>
     </div>
 
+    <?php if($_SESSION['role'] === 'admin'): ?>
     <div class="flex flex-col">
         <p class="px-4 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-3">Operasional</p>
         <div class="flex flex-col gap-1">
             <a href="transaksi.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'transaksi.php' ? 'active' : ''; ?>">
                 <span class="icon">🔄</span>
                 <div class="flex flex-col">
-                    <span class="text-sm font-medium">Arus Barang</span>
-                    <span class="text-[9px] text-slate-500 group-hover:text-cyan-400 italic">Masuk & Keluar</span>
+                    <span class="text-sm font-medium text-white">Arus Barang</span>
+                    <span class="text-[9px] text-slate-500 group-hover:text-cyan-400 italic font-medium transition-colors">Masuk & Keluar</span>
                 </div>
             </a>
         </div>
     </div>
+    <?php endif; ?>
 
     <div class="flex flex-col">
-        <p class="px-4 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-3">Laporan</p>
+        <p class="px-4 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-3">Laporan & Arsip</p>
         <div class="flex flex-col gap-1">
-            <a href="laporan_kartu.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_kartu.php' ? 'active' : ''; ?>">
-                <span class="icon">📑</span>
+            <a href="laporan_keluar.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_keluar.php' ? 'active' : ''; ?>">
+            <span class="icon">📦</span>
+            <div class="flex flex-col">
+                <span class="text-sm font-medium">Laporan Keluar</span>
+                <span class="text-[9px] text-slate-500 group-hover:text-cyan-400 italic">Riwayat Distribusi</span>
+            </div>
+            </a>
+            <a href="laporan_kartu.php" class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_kartu.php' ? 'active' : ''; ?>">
+                <span class="icon">📇</span>
                 <span class="text-sm font-medium">Kartu Gudang</span>
             </a>
-            <a href="laporan_stok_akhir.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_stok_akhir.php' ? 'active' : ''; ?>">
-                <span class="icon">📊</span>
+            <a href="laporan_stok_akhir.php" class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_stok_akhir.php' ? 'active' : ''; ?>">
+                <span class="icon">📉</span>
                 <span class="text-sm font-medium">Stok Akhir</span>
             </a>
-            <a href="laporan_antar_bulan.php" class="sidebar-link group <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_antar_bulan.php' ? 'active' : ''; ?>">
-                <span class="icon">📈</span>
-                <span class="text-sm font-medium">Analisis Periode</span>
+            <a href="laporan_antar_bulan.php" class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'laporan_antar_bulan.php' ? 'active' : ''; ?>">
+                <span class="icon">📅</span>
+                <span class="text-sm font-medium">Analisis Bulanan</span>
             </a>
         </div>
     </div>
-  </nav>
+
+</nav>
 
   <div class="p-4 border-t border-slate-800 bg-[#0f172a] flex-shrink-0">
     <a href="auth/logout.php"

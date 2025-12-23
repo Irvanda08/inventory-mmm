@@ -34,7 +34,6 @@ $transaksi = mysqli_query($conn, "
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-between hover:shadow-md transition-shadow">
             <div class="flex items-center gap-5">
                 <div class="bg-blue-100 p-4 rounded-xl text-blue-600 shadow-inner">
@@ -95,10 +94,11 @@ $transaksi = mysqli_query($conn, "
                 <thead>
                     <tr class="bg-slate-50/50 text-slate-500 uppercase text-[11px] font-black tracking-widest border-b border-slate-100">
                         <th class="px-6 py-4">Waktu</th>
-                        <th class="px-6 py-4">Informasi Barang</th>
-                        <th class="px-6 py-4 text-center">Status Transaksi</th>
+                        <th class="px-6 py-4">Kode</th>
+                        <th class="px-6 py-4">Nama Barang</th>
+                        <th class="px-6 py-4 text-center">Status</th>
                         <th class="px-6 py-4 text-center">Volume</th>
-                        <th class="px-6 py-4">Catatan/Keterangan</th>
+                        <th class="px-6 py-4">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -109,29 +109,35 @@ $transaksi = mysqli_query($conn, "
                                 <?= date('d M Y', strtotime($t['tanggal'])); ?>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex flex-col">
-                                    <span class="font-bold text-slate-800 group-hover:text-blue-600 transition-colors"><?= htmlspecialchars($t['nama_barang']); ?></span>
-                                    <span class="text-[10px] text-slate-400 font-mono"><?= $t['kode_barang'] ?? 'N/A'; ?></span>
-                                </div>
+                                <span class="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">
+                                    <?= $t['kode_barang'] ?? 'N/A'; ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                    <?= htmlspecialchars($t['nama_barang']); ?>
+                                </span>
                             </td>
                             <td class="px-6 py-4 text-center">
                                 <?php if(strtoupper($t['jenis']) == 'MASUK'): ?>
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700">IN (MASUK)</span>
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700">IN</span>
                                 <?php else: ?>
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700">OUT (KELUAR)</span>
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700">OUT</span>
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-center font-black text-slate-800">
                                 <?= number_format($t['jumlah']); ?> <span class="text-[9px] text-slate-400 font-normal uppercase ml-1"><?= htmlspecialchars($t['satuan']); ?></span>
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-500 italic">
-                                <?= $t['keterangan'] ? htmlspecialchars($t['keterangan']) : '<span class="text-slate-300">-</span>'; ?>
+                                <span class="truncate block max-w-[150px]" title="<?= htmlspecialchars($t['keterangan']); ?>">
+                                    <?= $t['keterangan'] ? htmlspecialchars($t['keterangan']) : '<span class="text-slate-300">-</span>'; ?>
+                                </span>
                             </td>
                         </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="px-6 py-20 text-center">
+                            <td colspan="6" class="px-6 py-20 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <span class="text-5xl opacity-20">📂</span>
                                     <p class="text-slate-400 font-medium italic">Belum ada rekaman transaksi hari ini.</p>

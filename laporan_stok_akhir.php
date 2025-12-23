@@ -1,42 +1,35 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 include 'config/database.php';
+include 'templates/header.php';
+include 'templates/sidebar.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: auth/login.php");
     exit;
 }
 
-// Ambil tanggal filter, default ke hari ini
+// Ambil tanggal filter, default ke hari ini jika tidak ada
 $tanggal = $_GET['tanggal'] ?? date('Y-m-d');
-$tgl_db = mysqli_real_escape_string($conn, $tanggal);
 
-// Query ini memastikan setiap barang hanya dihitung satu kali
-$sql = "SELECT 
-            b.kode_barang, 
-            b.nama_barang, 
-            b.satuan, 
-            b.stok_awal,
-            (b.stok_awal + IFNULL(t.total_masuk, 0) - IFNULL(t.total_keluar, 0)) AS sisa_stok
+// Query stok akhir dengan perhitungan agregat
+$sql = "SELECT b.kode_barang, b.nama_barang, b.satuan, 
+            SUM(CASE WHEN t.jenis='masuk' THEN t.jumlah ELSE 0 END) -
+            SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END) AS sisa_stok
         FROM barang b
-        LEFT JOIN (
-            SELECT 
-                id_barang,
-                SUM(CASE WHEN jenis = 'masuk' THEN jumlah ELSE 0 END) AS total_masuk,
-                SUM(CASE WHEN jenis = 'keluar' THEN jumlah ELSE 0 END) AS total_keluar
-            FROM transaksi_barang
-            WHERE tanggal <= '$tgl_db'
-            GROUP BY id_barang
-        ) t ON b.id_barang = t.id_barang
-        ORDER BY b.nama_barang ASC";
+        LEFT JOIN transaksi_barang t ON b.id_barang = t.id_barang";
+
+if($tanggal){
+    $sql .= " AND t.tanggal <= '".mysqli_real_escape_string($conn, $tanggal)."'";
+}
+
+$sql .= " GROUP BY b.id_barang, b.kode_barang, b.nama_barang, b.satuan
+          ORDER BY b.nama_barang ASC";
 
 $stok_query = mysqli_query($conn, $sql);
-$total_items = mysqli_num_rows($stok_query);
 
-include 'templates/header.php';
-include 'templates/sidebar.php';
+// Menghitung total item untuk kartu statistik
+$total_items = mysqli_num_rows($stok_query);
 ?>
 
 <style>
@@ -50,7 +43,6 @@ include 'templates/sidebar.php';
         th { background-color: #f8fafc !important; color: #000 !important; border-bottom: 2px solid #e2e8f0; }
     }
     
-    /* Memastikan konten mengisi ruang yang tersedia secara horizontal */
     .main-content-full {
         width: 100%;
         max-width: 100%;
@@ -111,11 +103,12 @@ include 'templates/sidebar.php';
                 <table class="w-full text-left table-auto border-collapse">
                     <thead>
                         <tr class="bg-slate-50/80 border-b border-slate-100">
-                            <th class="px-8 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-center w-24">No</th>
-                            <th class="px-8 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest">Identitas Barang</th>
-                            <th class="px-8 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-right">Volume Stok</th>
-                            <th class="px-8 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest">Satuan</th>
-                            <th class="px-8 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-center">Status Analisis</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-center w-16">No</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest w-40">Kode Barang</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest">Nama Barang</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-center">Volume Stok</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest">Satuan</th>
+                            <th class="px-6 py-6 text-xs font-extrabold text-slate-500 uppercase tracking-widest text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
@@ -126,44 +119,47 @@ include 'templates/sidebar.php';
                                 $stok = $row['sisa_stok'] ?? 0;
                         ?>
                         <tr class="hover:bg-slate-50/50 transition-all group">
-                            <td class="px-8 py-5 text-sm font-medium text-slate-400 text-center"><?= $no++; ?></td>
-                            <td class="px-8 py-5">
-                                <div class="flex flex-col gap-1">
-                                    <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors lowercase first-letter:uppercase"><?= htmlspecialchars($row['nama_barang']); ?></span>
-                                    <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider"><?= htmlspecialchars($row['kode_barang']); ?></span>
-                                </div>
+                            <td class="px-6 py-5 text-sm font-medium text-slate-400 text-center"><?= $no++; ?></td>
+                            <td class="px-6 py-5">
+                                <span class="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                                    <?= htmlspecialchars($row['kode_barang']); ?>
+                                </span>
                             </td>
-                            <td class="px-8 py-5 text-lg font-black text-right <?= $stok <= 5 ? 'text-red-600' : 'text-slate-800' ?>">
+                            <td class="px-6 py-5">
+                                <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors capitalize">
+                                    <?= htmlspecialchars($row['nama_barang']); ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-lg font-black text-center <?= $stok <= 5 ? 'text-red-600' : 'text-slate-800' ?>">
                                 <?= number_format($stok); ?>
                             </td>
-                            <td class="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-tighter"><?= htmlspecialchars($row['satuan']); ?></td>
-                            <td class="px-8 py-5 text-center">
+                            <td class="px-6 py-5 text-xs font-bold text-slate-400 uppercase tracking-tighter"><?= htmlspecialchars($row['satuan']); ?></td>
+                            <td class="px-6 py-5 text-center">
                                 <?php if($stok <= 0): ?>
-                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700 ring-1 ring-inset ring-red-200">Stok Habis</span>
+                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700 ring-1 ring-inset ring-red-200">Habis</span>
                                 <?php elseif($stok <= 5): ?>
-                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200">Stok Tersisa Sedikit</span>
+                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200">Sisa Sedikit</span>
                                 <?php else: ?>
-                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200">Stok Aman</span>
+                                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200">Aman</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
                         <?php
                             }
                         } else {
-                            echo "<tr><td colspan='5' class='px-8 py-32 text-center'><div class='flex flex-col items-center gap-2'><span class='text-4xl'>📂</span><p class='text-slate-400 font-medium italic'>Data stok tidak ditemukan untuk periode ini.</p></div></td></tr>";
+                            echo "<tr><td colspan='6' class='px-8 py-32 text-center'><div class='flex flex-col items-center gap-2'><span class='text-4xl'>📂</span><p class='text-slate-400 font-medium italic'>Data stok tidak ditemukan untuk periode ini.</p></div></td></tr>";
                         }
                         ?>
                     </tbody>
                 </table>
             </div>
-            
             <div class="h-12 bg-slate-50/30 border-t border-slate-50"></div>
         </div>
 
         <div class="mt-16 hidden print:grid grid-cols-2 text-center">
             <div></div>
             <div class="flex flex-col items-center">
-                <p class="text-sm text-slate-600 mb-24">Dicetak pada: <?= date('d/m/Y H:i') ?></p>
+                <p class="text-sm text-slate-600 mb-24">Dicetak pada: <?= date('d/m/Y') ?></p>
                 <div class="w-48 border-t border-slate-900"></div>
                 <p class="font-bold text-slate-800 mt-2">Kepala Gudang PT MMM</p>
             </div>
