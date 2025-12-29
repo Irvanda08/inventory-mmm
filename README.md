@@ -37,7 +37,7 @@ Sistem membedakan hak akses untuk menjaga keamanan data:
 ├── barang.php          # Manajemen Master Barang (Admin Only)
 ├── transaksi.php       # Pencatatan Arus Barang (Admin Only)
 └── laporan_*.php       # Berbagai Modul Pelaporan (Staff & Admin)
-
+```
 ⚙️ Instalasi Lokal (Development)
 Clone repositori:
 
