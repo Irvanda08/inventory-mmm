@@ -98,10 +98,11 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
                 JOIN barang b ON t.id_barang = b.id_barang";
 
         if(count($where)) $sql .= " WHERE ".implode(' AND ', $where);
-        $sql .= " ORDER BY t.tanggal ASC";
+        $sql .= " ORDER BY t.tanggal ASC, t.id_barang ASC"; // Tambahkan order id_barang agar lebih rapi
         $res = mysqli_query($conn, $sql);
 
         $t_masuk = 0; $t_keluar = 0;
+        $stok_per_barang = []; // Array penampung stok individu
     ?>
 
     <div id="preview-table">
@@ -123,7 +124,7 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                 <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-xl">📦</div>
                 <div>
-                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Stok Akhir Laporan</p>
+                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Stok Akhir</p>
                     <p id="stat-akhir" class="text-xl font-bold text-slate-800">0</p>
                 </div>
             </div>
@@ -149,13 +150,23 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <?php
-                        $stok = 0;
                         if(mysqli_num_rows($res) > 0){
                           while($row = mysqli_fetch_assoc($res)){
+                            $id = $row['id_barang'];
+                            
+                            // Inisialisasi stok per ID barang jika belum ada
+                            if(!isset($stok_per_barang[$id])) {
+                                $stok_per_barang[$id] = 0;
+                            }
+
                             $masuk = strtolower($row['jenis'])=='masuk' ? $row['jumlah'] : 0;
                             $keluar = strtolower($row['jenis'])=='keluar' ? $row['jumlah'] : 0;
-                            $stok += $masuk - $keluar;
-                            $t_masuk += $masuk; $t_keluar += $keluar;
+                            
+                            // Hitung stok khusus barang ini
+                            $stok_per_barang[$id] += ($masuk - $keluar);
+                            
+                            $t_masuk += $masuk; 
+                            $t_keluar += $keluar;
                         ?>
                         <tr class="hover:bg-slate-50/50 transition-colors">
                           <td class="px-6 py-4 text-sm font-medium text-slate-600">
@@ -174,15 +185,18 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
                               <?= $keluar ? '-'.number_format($keluar) : '-' ?>
                           </td>
                           <td class="px-6 py-4 text-center font-bold text-slate-800 bg-slate-50/30">
-                              <?= number_format($stok) ?>
+                              <?= number_format($stok_per_barang[$id]) ?>
                           </td>
                         </tr>
                         <?php } ?>
+
                         <script>
                             document.getElementById('stat-masuk').innerText = '<?= number_format($t_masuk) ?>';
                             document.getElementById('stat-keluar').innerText = '<?= number_format($t_keluar) ?>';
-                            document.getElementById('stat-akhir').innerText = '<?= number_format($stok) ?>';
+                            // Menjumlahkan seluruh isi array stok_per_barang untuk total stok akhir
+                            document.getElementById('stat-akhir').innerText = '<?= number_format(array_sum($stok_per_barang)) ?>';
                         </script>
+
                         <?php } else { ?>
                         <tr>
                             <td colspan="6" class="px-6 py-20 text-center">

@@ -11,10 +11,10 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-/** * Ambil data dari tabel transaksi_barang di-JOIN dengan tabel barang
- * Difilter hanya jenis 'keluar'
+/** * Query diperbarui: mengambil kolom 'kategori' langsung dari tabel barang
+ * Data ini sesuai dengan apa yang Anda inputkan di Master Barang (dropdown/manual)
  */
-$query = "SELECT t.*, b.nama_barang, b.satuan, b.kode_barang 
+$query = "SELECT t.*, b.nama_barang, b.satuan, b.kode_barang, b.kategori 
           FROM transaksi_barang t
           JOIN barang b ON t.id_barang = b.id_barang
           WHERE LOWER(TRIM(t.jenis)) = 'keluar' 
@@ -28,13 +28,13 @@ $result = mysqli_query($conn, $query);
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 w-full no-print">
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Laporan Barang Keluar</h1>
-            <p class="text-sm text-slate-500 mt-1">Rekapitulasi distribusi barang keluar PT Muara Mitra Mandiri</p>
+            <p class="text-sm text-slate-500 mt-1">Rekapitulasi distribusi barang keluar berdasarkan data Master Barang</p>
         </div>
         
         <div class="flex items-center gap-3">
             <div class="relative hidden sm:block">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">🔍</span>
-                <input type="text" id="searchInput" placeholder="Cari kode, nama, atau ket..." 
+                <input type="text" id="searchInput" placeholder="Cari kode, nama, atau kategori..." 
                     class="pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-64 md:w-80 transition-all shadow-sm">
             </div>
 
@@ -53,6 +53,7 @@ $result = mysqli_query($conn, $query);
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Kode Barang</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Barang</th>
+                        <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Jumlah</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan / Tujuan</th>
                     </tr>
@@ -60,6 +61,10 @@ $result = mysqli_query($conn, $query);
                 <tbody class="divide-y divide-slate-100">
                     <?php if (mysqli_num_rows($result) > 0) : ?>
                         <?php while($row = mysqli_fetch_assoc($result)) : ?>
+                        <?php 
+                            // Mengambil kategori dari inputan Master Barang
+                            $kat = !empty($row['kategori']) ? $row['kategori'] : 'Umum';
+                        ?>
                         <tr class="hover:bg-slate-50/50 transition-colors group">
                             <td class="px-6 py-4">
                                 <span class="text-sm font-medium text-slate-600"><?= date('d M Y', strtotime($row['tanggal'])); ?></span>
@@ -72,6 +77,11 @@ $result = mysqli_query($conn, $query);
                             <td class="px-6 py-4">
                                 <span class="text-sm font-bold text-slate-700">
                                     <?= htmlspecialchars($row['nama_barang']); ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                    <?= htmlspecialchars($kat); ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-right">
@@ -91,7 +101,7 @@ $result = mysqli_query($conn, $query);
                         <?php endwhile; ?>
                     <?php else : ?>
                         <tr id="noDataRow">
-                            <td colspan="5" class="p-10 text-center text-slate-400 italic">Data pengeluaran barang tidak ditemukan.</td>
+                            <td colspan="6" class="p-10 text-center text-slate-400 italic">Data pengeluaran barang tidak ditemukan.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -115,50 +125,25 @@ $result = mysqli_query($conn, $query);
 </main>
 
 <style>
-    /* Mengatur Layout agar rapi saat dicetak */
     @media print {
-        aside, #sidebarToggle, nav, header, .no-print, #modal { 
-            display: none !important; 
-        }
-        main { 
-            margin-left: 0 !important; 
-            padding: 0 !important; 
-            background: white !important;
-            width: 100% !important;
-        }
+        aside, #sidebarToggle, nav, header, .no-print, #modal { display: none !important; }
+        main { margin-left: 0 !important; padding: 0 !important; background: white !important; width: 100% !important; }
         body { background: white !important; }
-        table { border: 1px solid #e2e8f0; width: 100%; }
-        th { background-color: #f8fafc !important; color: #475569 !important; }
+        table { border: 1px solid #e2e8f0; width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #e2e8f0 !important; padding: 10px !important; }
     }
 </style>
 
 <script>
-    /**
-     * Logika Pencarian Real-time (Auto Update)
-     */
     document.getElementById('searchInput').addEventListener('keyup', function() {
         const filter = this.value.toLowerCase();
-        const table = document.getElementById('reportTable');
-        const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+        const rows = document.querySelectorAll('#reportTable tbody tr');
 
-        for (let i = 0; i < rows.length; i++) {
-            // Abaikan baris "Data tidak ditemukan" jika ada
-            if (rows[i].id === 'noDataRow') continue;
-
-            let visible = false;
-            const cells = rows[i].getElementsByTagName('td');
-            
-            for (let j = 0; j < cells.length; j++) {
-                if (cells[j]) {
-                    const text = cells[j].textContent || cells[j].innerText;
-                    if (text.toLowerCase().indexOf(filter) > -1) {
-                        visible = true;
-                        break;
-                    }
-                }
-            }
-            rows[i].style.display = visible ? "" : "none";
-        }
+        rows.forEach(row => {
+            if (row.id === 'noDataRow') return;
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
     });
 </script>
 
