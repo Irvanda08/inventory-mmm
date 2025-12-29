@@ -16,30 +16,28 @@ $satuan        = mysqli_real_escape_string($conn, $_POST['satuan']);
 $tanggal_masuk = $_POST['tanggal_masuk'];
 $keterangan    = mysqli_real_escape_string($conn, $_POST['keterangan']);
 
-// Simpan barang - Variabel disamakan menjadi $query_barang
-$query_barang = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok_awal, satuan, tanggal_masuk, keterangan) 
-                 VALUES ('$kode_barang', '$nama_barang', '$kategori', '$stok_awal', '$satuan', '$tanggal_masuk', '$keterangan')";
+// File: barang_simpan.php
 
-// Eksekusi query barang
+// REVISI: Paksa stok_awal di tabel barang menjadi 0 saat INSERT pertama kali
+$query_barang = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok_awal, satuan, tanggal_masuk, keterangan) 
+                 VALUES ('$kode_barang', '$nama_barang', '$kategori', 0, '$satuan', '$tanggal_masuk', '$keterangan')";
+
 if (!mysqli_query($conn, $query_barang)) {
     die("Gagal simpan barang: " . mysqli_error($conn));
 }
 
-// Ambil ID barang yang baru saja dimasukkan
 $id_barang = mysqli_insert_id($conn);
 
-// AUTO transaksi stok awal jika stok lebih dari 0
+// Transaksi otomatis inilah yang akan menjadi pengisi saldo di barang.php 
+// karena transaksi_simpan.php Anda akan mengupdate master secara otomatis.
 if ($stok_awal > 0) {
-    $query_transaksi = "
-      INSERT INTO transaksi_barang
-      (id_barang, tanggal, jenis, jumlah, keterangan)
-      VALUES
-      ($id_barang, '$tanggal_masuk', 'masuk', $stok_awal, 'Stok Awal')
-    ";
+    // Panggil file transaksi_simpan secara logic atau jalankan query update manual di sini
+    $query_transaksi = "INSERT INTO transaksi_barang (id_barang, tanggal, jenis, jumlah, keterangan)
+                        VALUES ($id_barang, '$tanggal_masuk', 'masuk', $stok_awal, 'Stok Awal')";
+    mysqli_query($conn, $query_transaksi);
 
-    if (!mysqli_query($conn, $query_transaksi)) {
-        die("Gagal simpan transaksi stok awal: " . mysqli_error($conn));
-    }
+    // Update Master Barang agar barang.php langsung terisi angkanya
+    mysqli_query($conn, "UPDATE barang SET stok_awal = $stok_awal WHERE id_barang = $id_barang");
 }
 
 // Redirect setelah SEMUA sukses

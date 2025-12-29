@@ -12,12 +12,6 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-if ($_SESSION['role'] !== 'admin') {
-    // Jika bukan admin, arahkan kembali ke dashboard dengan pesan error
-    header("Location: dashboard.php?error=akses_ditolak");
-    exit;
-}
-
 // 3. Header & Sidebar
 include 'templates/header.php';
 include 'templates/sidebar.php';
@@ -99,6 +93,7 @@ $total_keluar = $stats['keluar'] ?? 0;
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Jenis</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Jumlah</th>
                         <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                        <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -139,6 +134,19 @@ $total_keluar = $stats['keluar'] ?? 0;
                                 <?= !empty($t['keterangan']) ? htmlspecialchars($t['keterangan']) : '<span class="text-slate-300">Tanpa catatan</span>'; ?>
                             </p>
                         </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <button onclick='openEditModal(<?= json_encode($t); ?>)' 
+                                    class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+                                    ✏️
+                                </button>
+                                <a href="transaksi_hapus.php?id=<?= $t['id_transaksi']; ?>" 
+                                   onclick="return confirm('Hapus transaksi ini? Stok barang akan otomatis dikembalikan ke kondisi sebelumnya.')"
+                                   class="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus">
+                                    🗑️
+                                </a>
+                            </div>
+                        </td>
                     </tr>
                     <?php } ?>
                 </tbody>
@@ -157,7 +165,7 @@ $total_keluar = $stats['keluar'] ?? 0;
         <form action="transaksi_simpan.php" method="POST" class="p-8 space-y-5">
             <div class="space-y-2">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Pilih Produk</label>
-                <select name="id_barang" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer">
+                <select name="id_barang" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all">
                     <option value="">-- Cari Nama Barang --</option>
                     <?php
                     $barang = mysqli_query($conn, "SELECT id_barang, nama_barang, kode_barang, stok_awal FROM barang ORDER BY nama_barang");
@@ -172,7 +180,7 @@ $total_keluar = $stats['keluar'] ?? 0;
             <div class="grid grid-cols-2 gap-5">
                 <div class="space-y-2">
                     <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Jenis Arus</label>
-                    <select name="jenis" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all cursor-pointer">
+                    <select name="jenis" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all">
                         <option value="masuk">📥 Barang Masuk</option>
                         <option value="keluar">📤 Barang Keluar</option>
                     </select>
@@ -185,31 +193,88 @@ $total_keluar = $stats['keluar'] ?? 0;
 
             <div class="space-y-2">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Tanggal Transaksi</label>
-                <input type="date" name="tanggal" value="<?= date('Y-m-d'); ?>" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all font-medium">
+                <input type="date" name="tanggal" value="<?= date('Y-m-d'); ?>" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all">
             </div>
 
             <div class="space-y-2">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Keterangan / Tujuan</label>
-                <textarea name="keterangan" rows="3" placeholder="Contoh: Restock Supplier A atau Kirim ke Cabang B" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none"></textarea>
+                <textarea name="keterangan" rows="3" placeholder="Restock atau Pengiriman..." class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6">
+                <button type="button" onclick="document.getElementById('modal').classList.add('hidden')" class="px-6 py-2.5 text-xs font-black text-slate-400">Batal</button>
+                <button type="submit" class="px-8 py-2.5 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg transition-all uppercase tracking-widest">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalEdit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="bg-amber-50 px-8 py-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 class="font-bold text-slate-700 text-lg uppercase tracking-tight">Edit Riwayat Transaksi</h2>
+            <button onclick="document.getElementById('modalEdit').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        </div>
+        
+        <form action="transaksi_edit.php" method="POST" class="p-8 space-y-5">
+            <input type="hidden" name="id_transaksi" id="edit_id">
+            
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Nama Barang (Tetap)</label>
+                <input type="text" id="edit_nama_barang" disabled class="w-full bg-slate-100 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm text-slate-500 font-bold">
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Jenis Arus</label>
+                    <select name="jenis" id="edit_jenis" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all">
+                        <option value="masuk">📥 Barang Masuk</option>
+                        <option value="keluar">📤 Barang Keluar</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Jumlah Unit</label>
+                    <input type="number" name="jumlah" id="edit_jumlah" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all font-bold">
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Tanggal</label>
+                <input type="date" name="tanggal" id="edit_tanggal" required class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all">
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Keterangan / Catatan</label>
+                <textarea name="keterangan" id="edit_keterangan" rows="3" class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all resize-none"></textarea>
             </div>
 
             <div class="flex justify-end gap-3 pt-6 border-t border-slate-50">
-                <button type="button" onclick="document.getElementById('modal').classList.add('hidden')"
-                    class="px-6 py-2.5 text-xs font-black text-slate-400 hover:text-slate-600 transition-all">Batal</button>
-                <button type="submit" class="px-8 py-2.5 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all uppercase tracking-widest">Simpan Data</button>
+                <button type="button" onclick="document.getElementById('modalEdit').classList.add('hidden')" class="px-6 py-2.5 text-xs font-black text-slate-400">Batal</button>
+                <button type="submit" class="px-8 py-2.5 text-xs font-black text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-lg transition-all uppercase tracking-widest">Simpan Perubahan</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    // Search Real-time (Mencakup Kode & Nama yang sekarang terpisah)
+    // FUNGSI MODAL EDIT: Mengisi data otomatis saat tombol pensil diklik
+    function openEditModal(data) {
+        document.getElementById('edit_id').value = data.id_transaksi;
+        document.getElementById('edit_nama_barang').value = data.nama_barang;
+        document.getElementById('edit_jenis').value = data.jenis.toLowerCase().trim();
+        document.getElementById('edit_jumlah').value = data.jumlah;
+        document.getElementById('edit_tanggal').value = data.tanggal;
+        document.getElementById('edit_keterangan').value = data.keterangan;
+        
+        document.getElementById('modalEdit').classList.remove('hidden');
+    }
+
+    // Search Real-time
     document.getElementById('searchTransaksi').addEventListener('keyup', function() {
         let filter = this.value.toLowerCase();
         let rows = document.querySelectorAll('#tableTransaksi tbody tr');
 
         rows.forEach(row => {
-            // Mengambil text dari kolom Kode (index 1) dan Nama (index 2)
             let kode = row.cells[1].innerText.toLowerCase();
             let nama = row.cells[2].innerText.toLowerCase();
             let ket = row.cells[5].innerText.toLowerCase();
@@ -222,12 +287,12 @@ $total_keluar = $stats['keluar'] ?? 0;
         });
     });
 
-    // Close Modal on Overlay Click
+    // Close Modals on Overlay Click
     window.onclick = function(event) {
-        let modal = document.getElementById('modal');
-        if (event.target == modal) {
-            modal.classList.add('hidden');
-        }
+        let modalTambah = document.getElementById('modal');
+        let modalEdit = document.getElementById('modalEdit');
+        if (event.target == modalTambah) modalTambah.classList.add('hidden');
+        if (event.target == modalEdit) modalEdit.classList.add('hidden');
     }
 </script>
 
