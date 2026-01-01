@@ -19,28 +19,18 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
 ?>
 
 <style>
-    /* UI Tampilan Layar */
-    .container-proportional {
-        max-width: 1440px;
-        margin: 0 auto;
-    }
-
-    .table-compact th, .table-compact td {
-        padding: 0.75rem 1rem !important;
-        font-size: 0.875rem;
-    }
+    .container-proportional { max-width: 1440px; margin: 0 auto; }
+    .table-compact th, .table-compact td { padding: 0.75rem 1rem !important; font-size: 0.875rem; }
 
     @media print {
         .no-print, aside, nav, header, form, button { display: none !important; }
         body { background: white !important; }
         main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-        
-        /* Merapatkan Row saat Cetak */
         .table-compact th, .table-compact td {
             padding: 3px 6px !important; 
             font-size: 9pt !important;
             border: 1px solid #000 !important;
-            line-height: 1 !important;
+            line-height: 1.2 !important;
         }
         .print-header { display: block !important; text-align: center; border-bottom: 2px solid #000; margin-bottom: 10px; }
     }
@@ -103,7 +93,7 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
           </div>
 
           <div class="md:col-span-4 flex justify-end">
-            <button type="submit" name="preview" class="px-10 py-3 bg-slate-800 text-white rounded-xl text-sm font-black shadow-lg hover:bg-black transition-all uppercase tracking-widest">
+            <button type="submit" name="preview" value="1" class="px-10 py-3 bg-slate-800 text-white rounded-xl text-sm font-black shadow-lg hover:bg-black transition-all uppercase tracking-widest">
               Tampilkan Laporan
             </button>
           </div>
@@ -112,21 +102,17 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
 
       <?php if(isset($_GET['preview'])): ?>
         <?php
-            $where = [];
-            if($id_barang) $where[] = "t.id_barang = '$id_barang'";
-            if($bulan_awal) $where[] = "MONTH(t.tanggal) >= '$bulan_awal'";
-            if($bulan_akhir) $where[] = "MONTH(t.tanggal) <= '$bulan_akhir'";
-            if($tahun) $where[] = "YEAR(t.tanggal) = '$tahun'";
-
-            $sql = "SELECT t.*, b.kode_barang, b.nama_barang, b.satuan, b.stok_awal
+            // Query Transaksi sesuai range bulan
+            $sql = "SELECT t.*, b.kode_barang, b.nama_barang, b.satuan
                     FROM transaksi_barang t
-                    JOIN barang b ON t.id_barang = b.id_barang";
-
-            if(count($where)) $sql .= " WHERE ".implode(' AND ', $where);
-            $sql .= " ORDER BY t.tanggal ASC";
+                    JOIN barang b ON t.id_barang = b.id_barang
+                    WHERE YEAR(t.tanggal) = '$tahun' 
+                    AND MONTH(t.tanggal) BETWEEN '$bulan_awal' AND '$bulan_akhir'";
+            
+            if($id_barang) $sql .= " AND t.id_barang = '$id_barang'";
+            $sql .= " ORDER BY t.tanggal ASC, t.id_transaksi ASC";
             $res = mysqli_query($conn, $sql);
 
-            $t_masuk = 0; $t_keluar = 0;
             $stok_per_barang = []; 
         ?>
 
@@ -156,17 +142,25 @@ $barang_query = mysqli_query($conn, "SELECT * FROM barang ORDER BY nama_barang")
                               while($row = mysqli_fetch_assoc($res)){
                                 $id = $row['id_barang'];
                                 
+                                // LOGIKA BARU: Hitung saldo awal barang s/d sebelum bulan awal filter
                                 if(!isset($stok_per_barang[$id])) {
-                                    $stok_per_barang[$id] = $row['stok_awal'];
+                                    $tgl_limit = "$tahun-$bulan_awal-01";
+                                    $q_awal = mysqli_query($conn, "SELECT 
+                                        (SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE 0 END) - 
+                                         SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END)) as saldo_lalu
+                                        FROM transaksi_barang 
+                                        WHERE id_barang = '$id' AND tanggal < '$tgl_limit'");
+                                    $d_awal = mysqli_fetch_assoc($q_awal);
+                                    
+                                    // Mulai dari 0 (asumsi stok awal master barang sudah masuk ke tabel transaksi sebagai 'masuk')
+                                    $stok_per_barang[$id] = $d_awal['saldo_lalu'] ?? 0;
                                 }
 
                                 $masuk = strtolower($row['jenis'])=='masuk' ? $row['jumlah'] : 0;
                                 $keluar = strtolower($row['jenis'])=='keluar' ? $row['jumlah'] : 0;
                                 
+                                // Saldo Berjalan
                                 $stok_per_barang[$id] += ($masuk - $keluar);
-                                
-                                $t_masuk += $masuk; 
-                                $t_keluar += $keluar;
                             ?>
                             <tr class="hover:bg-slate-50/50 transition-colors">
                               <td class="font-bold text-slate-600">

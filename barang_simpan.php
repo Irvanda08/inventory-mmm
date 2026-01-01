@@ -6,41 +6,48 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Ambil data dan proteksi dari SQL Injection
+if ($_SESSION['role'] !== 'admin') {
+    // Jika bukan admin, arahkan kembali ke dashboard dengan pesan error
+    header("Location: dashboard.php?error=akses_ditolak");
+    exit;
+}
+
+// 1. Proteksi Input
 $kode_barang   = mysqli_real_escape_string($conn, $_POST['kode_barang']);
 $nama_barang   = mysqli_real_escape_string($conn, $_POST['nama_barang']);
-// Tambahkan proteksi string untuk kategori
 $kategori      = mysqli_real_escape_string($conn, $_POST['kategori']); 
-$stok_awal     = (int) $_POST['stok_awal'];
+$jumlah_input  = (int) $_POST['stok_awal']; 
 $satuan        = mysqli_real_escape_string($conn, $_POST['satuan']);
 $tanggal_masuk = $_POST['tanggal_masuk'];
 $keterangan    = mysqli_real_escape_string($conn, $_POST['keterangan']);
 
-// File: barang_simpan.php
+// 2. Cek apakah kode barang sudah ada (mencegah Duplicate Entry)
+$cek_kode = mysqli_query($conn, "SELECT kode_barang FROM barang WHERE kode_barang = '$kode_barang'");
+if (mysqli_num_rows($cek_kode) > 0) {
+    header("Location: barang.php?status=duplicate&kode=$kode_barang");
+    exit;
+}
 
-// REVISI: Paksa stok_awal di tabel barang menjadi 0 saat INSERT pertama kali
+// 3. Simpan ke tabel barang (Perbaikan: stok_awal diisi variabel $jumlah_input)
 $query_barang = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok_awal, satuan, tanggal_masuk, keterangan) 
-                 VALUES ('$kode_barang', '$nama_barang', '$kategori', 0, '$satuan', '$tanggal_masuk', '$keterangan')";
+                 VALUES ('$kode_barang', '$nama_barang', '$kategori', $jumlah_input, '$satuan', '$tanggal_masuk', '$keterangan')";
 
-if (!mysqli_query($conn, $query_barang)) {
-    die("Gagal simpan barang: " . mysqli_error($conn));
+if (mysqli_query($conn, $query_barang)) {
+    $id_barang = mysqli_insert_id($conn);
+
+    // 4. AUTO transaksi: Masukkan ke history transaksi_barang
+    if ($jumlah_input > 0) {
+        $query_transaksi = "INSERT INTO transaksi_barang (id_barang, tanggal, jenis, jumlah, keterangan) 
+                            VALUES ($id_barang, '$tanggal_masuk', 'masuk', $jumlah_input, 'Saldo Awal Barang')";
+        
+        if (!mysqli_query($conn, $query_transaksi)) {
+            die("Gagal simpan transaksi: " . mysqli_error($conn));
+        }
+    }
+
+    header("Location: barang.php?status=success");
+    exit;
+} else {
+    die("Gagal simpan master barang: " . mysqli_error($conn));
 }
-
-$id_barang = mysqli_insert_id($conn);
-
-// Transaksi otomatis inilah yang akan menjadi pengisi saldo di barang.php 
-// karena transaksi_simpan.php Anda akan mengupdate master secara otomatis.
-if ($stok_awal > 0) {
-    // Panggil file transaksi_simpan secara logic atau jalankan query update manual di sini
-    $query_transaksi = "INSERT INTO transaksi_barang (id_barang, tanggal, jenis, jumlah, keterangan)
-                        VALUES ($id_barang, '$tanggal_masuk', 'masuk', $stok_awal, 'Stok Awal')";
-    mysqli_query($conn, $query_transaksi);
-
-    // Update Master Barang agar barang.php langsung terisi angkanya
-    mysqli_query($conn, "UPDATE barang SET stok_awal = $stok_awal WHERE id_barang = $id_barang");
-}
-
-// Redirect setelah SEMUA sukses
-header("Location: barang.php?status=success");
-exit;
 ?>

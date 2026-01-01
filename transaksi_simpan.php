@@ -7,6 +7,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+if ($_SESSION['role'] !== 'admin') {
+    // Jika bukan admin, arahkan kembali ke dashboard dengan pesan error
+    header("Location: dashboard.php?error=akses_ditolak");
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id_barang  = mysqli_real_escape_string($conn, $_POST['id_barang']);
     $jenis      = mysqli_real_escape_string($conn, $_POST['jenis']);

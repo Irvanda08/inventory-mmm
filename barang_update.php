@@ -2,6 +2,12 @@
 include 'config/database.php';
 session_start();
 
+// Proteksi: Hanya Admin yang bisa eksekusi update
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = $_POST['id_barang'];
     $kode = mysqli_real_escape_string($conn, $_POST['kode_barang']);
@@ -17,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $data_lama = mysqli_fetch_assoc($query_lama);
     $stok_lama = (int)$data_lama['stok_awal'];
 
-    // 2. Mulai Transaksi Database
+    // 2. Mulai Transaksi Database untuk konsistensi data
     mysqli_begin_transaction($conn);
 
     try {
@@ -33,14 +39,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                   WHERE id_barang = '$id'";
         mysqli_query($conn, $query_update);
 
-        // 4. Cek jika ada perubahan angka stok, catat di transaksi_barang
+        // 4. Catat selisih ke tabel transaksi agar Laporan & Arus Barang sinkron
         if ($stok_baru != $stok_lama) {
             $selisih = abs($stok_baru - $stok_lama);
             $jenis = ($stok_baru > $stok_lama) ? 'masuk' : 'keluar';
             $ket_adj = "Penyesuaian Stok (Edit Master)";
 
             $query_adj = "INSERT INTO transaksi_barang (id_barang, jenis, jumlah, tanggal, keterangan) 
-                          VALUES ('$id', '$jenis', '$selisih', '".date('Y-m-d')."', '$ket_adj')";
+                          VALUES ('$id', '$jenis', '$selisih', '" . date('Y-m-d') . "', '$ket_adj')";
             mysqli_query($conn, $query_adj);
         }
 

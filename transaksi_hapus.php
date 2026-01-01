@@ -7,6 +7,12 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
     exit;
 }
 
+if ($_SESSION['role'] !== 'admin') {
+    // Jika bukan admin, arahkan kembali ke dashboard dengan pesan error
+    header("Location: dashboard.php?error=akses_ditolak");
+    exit;
+}
+
 $id = $_GET['id'];
 
 // 1. Ambil detail transaksi sebelum dihapus

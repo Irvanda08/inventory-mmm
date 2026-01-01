@@ -24,47 +24,44 @@ $query = "SELECT t.*, b.nama_barang, b.satuan, b.kode_barang, b.kategori
           ORDER BY t.tanggal DESC, t.id_transaksi DESC";
           
 $result = mysqli_query($conn, $query);
+
+// Menghitung Ringkasan (Stats)
+$total_qty = 0;
+$total_transaksi = mysqli_num_rows($result);
+$data_array = [];
+while($row = mysqli_fetch_assoc($result)) {
+    $total_qty += $row['jumlah'];
+    $data_array[] = $row;
+}
 ?>
 
 <style>
-    /* 1. TAMPILAN UI DI LAYAR (DASHBOARD) */
-    .container-proportional {
-        max-width: 1440px;
-        margin: 0 auto;
+    .container-proportional { max-width: 1440px; margin: 0 auto; }
+    
+    /* UI TAMPILAN LAYAR */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(226, 232, 240, 0.8);
     }
-
-    .table-proportional {
-        border-collapse: separate;
-        border-spacing: 0;
-        width: 100%;
-    }
-
+    
     .table-proportional th { 
-        padding: 0.75rem 0.5rem !important; 
-        font-size: 0.75rem; 
-        border-bottom: 1px solid #e2e8f0;
+        padding: 0.75rem 0.75rem !important;
+        font-size: 0.7rem; 
+        background: #f8fafc;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     
     .table-proportional td { 
-        padding: 0.5rem 0.5rem !important; 
-        font-size: 0.813rem; 
-        border-bottom: 1px solid #f1f5f9;
-        line-height: 1.25;
+        padding: 0.75rem 0.75rem !important; 
+        font-size: 0.875rem;
     }
 
-    /* 2. KHUSUS HASIL CETAK / PRINT (SANGAT RAPAT) */
+    /* KHUSUS HASIL CETAK / PRINT (EKSTREM RAPAT) */
     @media print {
-        /* Sembunyikan elemen non-cetak */
-        aside, nav, header, .no-print, form, button { 
-            display: none !important; 
-        }
-        
-        main { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            width: 100% !important; 
-            background: white !important; 
-        }
+        aside, nav, header, .no-print, form, button { display: none !important; }
+        main { margin: 0 !important; padding: 0 !important; width: 100% !important; background: white !important; }
         
         #printableArea { 
             visibility: visible; 
@@ -77,152 +74,174 @@ $result = mysqli_query($conn, $query);
         .print-header { 
             display: block !important; 
             border-bottom: 2px solid #000; 
-            margin-bottom: 8px; 
+            margin-bottom: 10px; 
             text-align: center; 
         }
         
-        /* EKSTREM RAPAT: Border solid & padding minimal */
+        /* Merapatkan baris: Padding minimal dan line-height dipaksa 1 */
         table { 
             width: 100%; 
             border-collapse: collapse !important; 
             border: 1px solid #000 !important;
-            border-radius: 0 !important;
         }
         
         th, td { 
             border: 1px solid #000 !important; 
-            padding: 2px 4px !important; 
+            padding: 1px 4px !important; /* Padding sangat tipis untuk merapatkan row */
             font-size: 8.5pt !important; 
-            line-height: 1 !important;
+            line-height: 1 !important; /* Menghilangkan spasi antar baris teks */
             color: black !important;
-            visibility: visible !important;
         }
 
-        /* Matikan rounded & shadow agar garis tidak hilang saat print */
-        .rounded-3xl, .rounded-2xl, .overflow-hidden, .bg-white { 
+        .glass-card, .rounded-3xl, .shadow-xl { 
             border-radius: 0 !important; 
-            overflow: visible !important; 
-            box-shadow: none !important;
-            border: none !important;
+            box-shadow: none !important; 
+            border: none !important; 
         }
 
-        /* Penyesuaian jarak tanda tangan */
-        .mt-6 { margin-top: 1rem !important; }
-        .mb-14 { margin-bottom: 3rem !important; }
-
-        .text-blue-600 { color: black !important; font-weight: bold !important; }
-        .bg-blue-50, .bg-slate-100 { background: transparent !important; }
+        /* Jarak tanda tangan yang lebih efisien */
+        .mt-12 { margin-top: 1.5rem !important; }
+        .mb-20 { margin-bottom: 2.5rem !important; }
     }
 </style>
 
-<main class="flex-1 bg-slate-50 min-h-screen p-4 md:p-8 w-full">
+<main class="flex-1 bg-[#fcfcfd] min-h-screen p-4 md:p-8 w-full">
     <div class="container-proportional">
         
-        <div class="hidden print-header pb-2">
-            <h1 class="text-xl font-bold uppercase leading-tight">Laporan Pengeluaran Barang</h1>
-            <p class="text-sm font-bold">PT MUARA MITRA MANDIRI</p>
-            <p class="text-xs">Periode: <?= date('d/m/Y', strtotime($tgl_mulai)) ?> s/d <?= date('d/m/Y', strtotime($tgl_sampai)) ?></p>
-        </div>
-
-        <div class="no-print flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div class="no-print flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div>
-                <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Barang Keluar</h1>
-                <p class="text-slate-500 mt-1 font-medium">Rekapitulasi distribusi pengeluaran gudang</p>
+                <h1 class="text-4xl font-black text-slate-900 tracking-tight">Barang Keluar</h1>
+                <p class="text-slate-500 mt-1 flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                    Log distribusi dan pengeluaran inventaris gudang
+                </p>
             </div>
-            <button onclick="window.print()" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-200 transition-all active:scale-95">
+            <button onclick="window.print()" class="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all shadow-sm">
                 <span>🖨️</span> Cetak Laporan
             </button>
         </div>
 
-        <div class="no-print bg-white p-5 rounded-3xl shadow-sm border border-slate-200/60 mb-6">
-            <form method="GET" class="flex flex-wrap items-end gap-4">
-                <div class="flex-1 min-w-[150px] space-y-1">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dari</label>
-                    <input type="date" name="tgl_mulai" value="<?= $tgl_mulai ?>" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-all">
+        <div class="no-print grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass-card p-6 rounded-[2rem] shadow-sm flex items-center gap-5">
+                <div class="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">📦</div>
+                <div>
+                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Total Transaksi</p>
+                    <p class="text-2xl font-black text-slate-800"><?= number_format($total_transaksi); ?> <span class="text-sm font-medium text-slate-400">Record</span></p>
                 </div>
-                <div class="flex-1 min-w-[150px] space-y-1">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sampai</label>
-                    <input type="date" name="tgl_sampai" value="<?= $tgl_sampai ?>" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-all">
+            </div>
+            <div class="glass-card p-6 rounded-[2rem] shadow-sm flex items-center gap-5">
+                <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-2xl">📤</div>
+                <div>
+                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Total Volume Keluar</p>
+                    <p class="text-2xl font-black text-slate-800"><?= number_format($total_qty); ?> <span class="text-sm font-medium text-slate-400">Unit</span></p>
                 </div>
-                <button type="submit" class="px-6 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-all">Filter</button>
-                <div class="flex-[2] min-w-[250px] relative">
-                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">🔍</span>
-                    <input type="text" id="searchInput" placeholder="Cari kode, nama barang, atau kategori..." 
-                        class="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 bg-white transition-all">
+            </div>
+            <div class="glass-card p-6 rounded-[2rem] shadow-sm flex items-center gap-5">
+                <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl">📅</div>
+                <div>
+                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Periode</p>
+                    <p class="text-sm font-bold text-slate-800"><?= date('d M', strtotime($tgl_mulai)) ?> — <?= date('d M Y', strtotime($tgl_sampai)) ?></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="no-print glass-card p-4 rounded-[1.5rem] shadow-sm mb-6">
+            <form method="GET" class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-3 bg-slate-100/50 p-1.5 rounded-xl border border-slate-200">
+                    <div class="px-3">
+                        <label class="block text-[9px] font-black text-slate-400 uppercase">Dari</label>
+                        <input type="date" name="tgl_mulai" value="<?= $tgl_mulai ?>" class="bg-transparent border-none p-0 text-sm font-bold focus:ring-0">
+                    </div>
+                    <div class="h-8 w-px bg-slate-200"></div>
+                    <div class="px-3">
+                        <label class="block text-[9px] font-black text-slate-400 uppercase">Sampai</label>
+                        <input type="date" name="tgl_sampai" value="<?= $tgl_sampai ?>" class="bg-transparent border-none p-0 text-sm font-bold focus:ring-0">
+                    </div>
+                    <button type="submit" class="bg-slate-800 text-white p-2.5 rounded-lg hover:bg-black transition-all">Filter</button>
+                </div>
+                <div class="flex-1 relative">
+                    <span class="absolute inset-y-0 left-4 flex items-center text-slate-400">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Cari data..." class="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all">
                 </div>
             </form>
         </div>
 
-        <div class="bg-white rounded-[1.5rem] shadow-sm border border-slate-200/60 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left table-auto table-proportional" id="reportTable">
-                    <thead>
-                        <tr class="bg-slate-50 border-b border-slate-100">
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Tanggal</th>
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Kode Barang</th>
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Nama Barang</th>
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Kategori</th>
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Jumlah</th>
-                            <th class="font-bold text-slate-500 uppercase tracking-wider text-center">Keterangan / Tujuan</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <?php if (mysqli_num_rows($result) > 0) : ?>
-                            <?php while($row = mysqli_fetch_assoc($result)) : ?>
-                            <tr class="hover:bg-slate-50/50 transition-colors group">
-                                <td class="whitespace-nowrap font-bold text-slate-700">
-                                    <?= date('d/m/Y', strtotime($row['tanggal'])); ?>
-                                </td>
-                                <td class="text-center">
-                                    <span class="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">
-                                        <?= $row['kode_barang']; ?>
-                                    </span>
-                                </td>
-                                <td class="font-bold text-slate-800">
-                                    <?= htmlspecialchars($row['nama_barang']); ?>
-                                </td>
-                                <td class="text-center">
-                                    <span class="category-badge inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase">
-                                        <?= str_replace(',', '<br>', htmlspecialchars($row['kategori'] ?: 'Umum')); ?>
-                                    </span>
-                                </td>
-                                <td class="text-right whitespace-nowrap">
-                                    <span class="font-black text-rose-600">- <?= number_format($row['jumlah']); ?></span>
-                                    <span class="text-[9px] text-slate-400 font-bold uppercase"><?= $row['satuan']; ?></span>
-                                </td>
-                                <td class="text-xs text-slate-500 italic leading-tight">
-                                    <?= $row['keterangan'] ?: '-'; ?>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else : ?>
-                            <tr>
-                                <td colspan="6" class="p-16 text-center text-slate-400 italic font-medium">Data pengeluaran tidak ditemukan pada periode ini.</td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+        <div id="printableArea">
+            <div class="hidden print-header pb-4 text-center">
+                <h1 class="text-2xl font-bold uppercase">Laporan Pengeluaran Barang</h1>
+                <p class="text-md font-bold">PT MUARA MITRA MANDIRI</p>
+                <p class="text-xs italic">Periode: <?= date('d/m/Y', strtotime($tgl_mulai)) ?> — <?= date('d/m/Y', strtotime($tgl_sampai)) ?></p>
             </div>
-        </div>
 
-        <div class="hidden print:block mt-6">
-            <div class="flex justify-between items-start px-10">
-                <div class="text-center w-56">
-                    <p class="text-[9pt] mb-12">Mengetahui,</p>
-                    <p class="text-[9pt] font-bold border-t border-black pt-1">Direksi PT MMM</p>
+            <div class="glass-card rounded-[2rem] shadow-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left table-proportional" id="reportTable">
+                        <thead>
+                            <tr class="border-b border-slate-100">
+                                <th class="text-center w-24">Tanggal</th>
+                                <th class="text-center w-24">Kode</th>
+                                <th class="text-center">Nama Barang</th>
+                                <th class="text-center">Kategori</th>
+                                <th class="text-center">Jumlah</th>
+                                <th>Keterangan / Tujuan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <?php if (!empty($data_array)) : ?>
+                                <?php foreach($data_array as $row) : ?>
+                                <tr class="hover:bg-blue-50/30 transition-colors">
+                                    <td class="whitespace-nowrap font-bold text-slate-600 text-center"><?= date('d/m/Y', strtotime($row['tanggal'])); ?></td>
+                                    <td class="text-center">
+                                        <span class="text-[10px] font-mono font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
+                                            <?= $row['kode_barang']; ?>
+                                        </span>
+                                    </td>
+                                    <td class=" text-center font-bold text-slate-800 uppercase"><?= htmlspecialchars($row['nama_barang']); ?></td>
+                                    <td class="text-center">
+                                        <span class="inline-block px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase">
+                                            <?= htmlspecialchars($row['kategori'] ?: 'Umum'); ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="flex flex-col items-center">
+                                            <span class="font-black text-rose-600">- <?= number_format($row['jumlah']); ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="text-xs text-slate-500 leading-relaxed"><?= $row['keterangan'] ?: '-'; ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php else : ?>
+                                <tr><td colspan="6" class="p-24 text-center text-slate-400 font-bold uppercase tracking-widest">Tidak ada data</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="text-center w-56">
-                    <p class="text-[9pt] mb-2 text-right italic">Dicetak: <?= date('d/m/Y') ?></p>
-                    <p class="text-[9pt] mb-12">Kord. Workshop</p>
-                    <p class="text-[9pt] font-bold border-t border-black pt-1">Nopri Adrian</p>
-                </div>
+            </div>
+
+            <div class="hidden print:block mt-12 mb-8">
+                <table class="w-full" style="border: none !important;">
+                    <tr style="border: none !important;">
+                        <td class="text-center w-1/2" style="border: none !important; vertical-align: bottom;">
+                            <p class="text-[10pt] mb-20">Mengetahui,</p>
+                            <div class="inline-block w-56 border-t border-black pt-2">
+                                <p class="text-[10pt] font-black">Direksi PT MMM</p>
+                            </div>
+                        </td>
+                        <td class="text-center w-1/2" style="border: none !important; vertical-align: bottom;">
+                            <p class="text-[8pt] italic text-right mb-4 opacity-70">Sistem Inventaris — <?= date('d/m/Y') ?></p>
+                            <p class="text-[10pt] mb-20">Kord. Workshop,</p>
+                            <div class="inline-block w-56 border-t border-black pt-2">
+                                <p class="text-[10pt] font-black">Nopri Adrian</p>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
     </div>
 </main>
 
 <script>
-    // Fitur Pencarian Real-time
     document.getElementById('searchInput').addEventListener('keyup', function() {
         const filter = this.value.toLowerCase();
         const rows = document.querySelectorAll('#reportTable tbody tr');

@@ -50,6 +50,23 @@ include 'templates/sidebar.php';
 </style>
 
 <main class="flex-1 bg-slate-50 min-h-screen p-4 md:p-8">
+    
+    <?php if (isset($_GET['status'])): ?>
+        <div class="mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
+            <?php if ($_GET['status'] == 'success'): ?>
+                <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-xl flex items-center gap-3">
+                    <span class="text-emerald-600 text-xl">✅</span>
+                    <p class="text-emerald-800 font-bold text-sm">Data inventaris berhasil diperbarui!</p>
+                </div>
+            <?php elseif ($_GET['status'] == 'duplicate'): ?>
+                <div class="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-xl flex items-center gap-3">
+                    <span class="text-rose-600 text-xl">❌</span>
+                    <p class="text-rose-800 font-bold text-sm">Gagal! Kode Barang <strong><?= htmlspecialchars($_GET['kode'] ?? '') ?></strong> sudah terdaftar.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Inventaris</h1>
@@ -108,7 +125,6 @@ include 'templates/sidebar.php';
                         <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Kategori</th>
                         <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Stok</th>
                         <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Tgl Masuk</th>
-                        <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Keterangan</th>
                         <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -126,10 +142,8 @@ include 'templates/sidebar.php';
                         <td class="px-6 py-4">
                             <span class="font-bold text-slate-900 text-sm"><?= htmlspecialchars($b['nama_barang']); ?></span>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                                <?= htmlspecialchars($kat); ?>
-                            </span>
+                        <td class="px-6 py-4 text-xs uppercase font-bold text-slate-500">
+                            <?= htmlspecialchars($kat); ?>
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-2">
@@ -141,11 +155,6 @@ include 'templates/sidebar.php';
                         </td>
                         <td class="px-6 py-4 text-sm text-slate-700">
                             <?= date('d/m/y', strtotime($b['tanggal_masuk']));?>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-xs text-slate-400 italic max-w-[120px] block truncate" title="<?= htmlspecialchars($b['keterangan']); ?>">
-                                <?= $b['keterangan'] ? htmlspecialchars($b['keterangan']) : '-'; ?>
-                            </span>
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex justify-center items-center gap-2">
@@ -335,6 +344,7 @@ function toggleModal(modalId, show) {
         modal.classList.add('modal-active');
     } else {
         modal.classList.remove('modal-active');
+        // Reset manual fields if closing add modal
         if(modalId === 'modal') {
             resetManual('selectSatuanTambah', 'manualSatuanTambah', 'satuan');
             resetManual('selectKategoriTambah', 'manualKategoriTambah', 'kategori');
@@ -342,22 +352,24 @@ function toggleModal(modalId, show) {
     }
 }
 
+// FUNGSI HYBRID TERBARU: Mencegah nama input ganda
 function handleHybrid(selectElem, containerId) {
     const container = document.getElementById(containerId);
     const manualInput = container.querySelector('input');
-    const fieldName = containerId.toLowerCase().includes('satuan') ? 'satuan' : 'kategori';
+    const isSatuan = containerId.toLowerCase().includes('satuan');
+    const fieldName = isSatuan ? 'satuan' : 'kategori';
 
     if (selectElem.value === 'Lainnya') {
         container.classList.remove('hidden');
         manualInput.setAttribute('required', 'true');
-        manualInput.setAttribute('name', fieldName);
-        selectElem.removeAttribute('name');
+        manualInput.setAttribute('name', fieldName); // Input manual ambil alih nama variabel
+        selectElem.removeAttribute('name');           // Select melepaskan nama variabel agar tidak konflik
         manualInput.focus();
     } else {
         container.classList.add('hidden');
         manualInput.removeAttribute('required');
-        manualInput.removeAttribute('name');
-        selectElem.setAttribute('name', fieldName);
+        manualInput.removeAttribute('name');          // Input manual melepaskan nama
+        selectElem.setAttribute('name', fieldName);   // Select mengambil alih nama variabel
     }
 }
 
@@ -366,7 +378,9 @@ function resetManual(selectId, containerId, originalName) {
     const con = document.getElementById(containerId);
     con.classList.add('hidden');
     sel.setAttribute('name', originalName);
-    con.querySelector('input').removeAttribute('name');
+    const inp = con.querySelector('input');
+    inp.removeAttribute('name');
+    inp.value = "";
 }
 
 function openEditModal(id, kode, nama, stok, satuan, kategori, tanggal, ket) {
@@ -377,6 +391,7 @@ function openEditModal(id, kode, nama, stok, satuan, kategori, tanggal, ket) {
     document.getElementById('edit_tanggal').value = tanggal;
     document.getElementById('edit_keterangan').value = ket;
 
+    // Sinkronisasi Field Hybrid untuk Satuan & Kategori
     syncField('edit_satuan', 'edit_satuan_manual', 'manualSatuanEdit', satuan, 'satuan');
     syncField('edit_kategori', 'edit_kategori_manual', 'manualKategoriEdit', kategori, 'kategori');
     
@@ -398,6 +413,7 @@ function syncField(selectId, manualId, containerId, value, fieldName) {
         sel.setAttribute('name', fieldName);
         con.classList.add('hidden');
         man.removeAttribute('name');
+        man.value = "";
     } else {
         sel.value = 'Lainnya';
         sel.removeAttribute('name');
@@ -407,19 +423,16 @@ function syncField(selectId, manualId, containerId, value, fieldName) {
     }
 }
 
+// Pencarian Tabel
 document.getElementById('searchInput').addEventListener('keyup', function() {
     let filter = this.value.toLowerCase();
     let rows = document.querySelectorAll('#inventoryTable tbody tr');
     
     rows.forEach(row => {
-        // cells[0] = Kode
-        // cells[1] = Nama Barang
-        // cells[2] = Kategori
         let kode = row.cells[0].innerText.toLowerCase();
         let nama = row.cells[1].innerText.toLowerCase();
         let kategori = row.cells[2].innerText.toLowerCase();
         
-        // Cek jika salah satu kolom mengandung kata kunci
         if (kode.includes(filter) || nama.includes(filter) || kategori.includes(filter)) {
             row.style.display = "";
         } else {
